@@ -34,7 +34,7 @@ class ViolaJones:
         for stump in range(self.classifiers):
             weights = weights / np.linalg.norm(weights)
             weak_classifiers = self.train_weak(X, y, features, weights)
-            clf, error, accuracy = self.select_best(weak_classifiers, weights, training_data)
+            clf, error, accuracy = self.select_best(weak_classifiers, weights, processed_data)
             beta = error / (1.0 - error)
             for i in range(len(accuracy)):
                 weights[i] = weights[i] * (beta ** (1 - accuracy[i]))
@@ -112,7 +112,7 @@ class ViolaJones:
                                 haar_features.append(([SubMatrix(x, y, wndw, wndh), SubMatrix(x+wndw, y+wndh, wndw, wndh)], [SubMatrix(x+wndw, y, wndw, wndh), SubMatrix(x, y+wndh, wndw, wndh)]))
         return np.array(haar_features)
 
-    def select_best(self, classifiers, weights, training_data):
+    def select_best(self, classifiers, weights, processed_data):
         """
         Selects the best weak classifier for the given weights
           Args:
@@ -122,17 +122,26 @@ class ViolaJones:
           Returns:
             A tuple containing the best classifier, its error, and an array of its accuracy
         """
-        best_clf, best_error, best_accuracy = None, float('inf'), None
+        bestclf = None
+        besterr = float('inf')
+        bestacc = None
         for clf in classifiers:
-            error, accuracy = 0, []
-            for data, w in zip(training_data, weights):
-                correctness = abs(clf.classify(data[0]) - data[1])
-                accuracy.append(correctness)
-                error += w * correctness
-            error = error / len(training_data)
-            if error < best_error:
-                best_clf, best_error, best_accuracy = clf, error, accuracy
-        return best_clf, best_error, best_accuracy
+            err = 0
+            acc =  []
+            n = len(weights)
+            assert(len(weights)==(processed_data.shape[0]))
+            for i in range(n):
+                ground_truth = processed_data[i][1]
+                found_truth = clf.classify(processed_data[i][0])
+                score = abs(found_truth - ground_truth)
+                acc.append(score)
+                err += weights[i] * score
+            err = err / len(processed_data)
+            if err < besterr:
+                bestclf = clf
+                besterr = err
+                bestacc = acc
+        return bestclf, besterr, bestacc
     
     def apply_features(self, features, training_data):
         num_features = len(features)
