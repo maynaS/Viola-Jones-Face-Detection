@@ -12,9 +12,9 @@ class WeakClassifier:
     def classify(self, x):
         pos_sum = 0
         for pos in self.positive_region:
-            pos_sum += pos.compute_feature(x)
+            pos_sum += pos.get_feature_val(x)
         neg_sum = 0
         for neg in self.negative_region:
-            neg_sum += neg.compute_feature(x)
+            neg_sum += neg.get_feature_val(x)
         return 1 if self.polarity * (pos_sum - neg_sum) < self.polarity * self.threshold else 0
     

@@ -15,13 +15,13 @@ class CascadeClassifier:
                 positive.append(training[i])
             else:
                 negative.append(training[i])
-        
-        for i in range(len(self.layers)):
-            if len(negative) == 0:
-                print("Stopping early")
-                break
+        print(negative.__len__())
+        for i in range(self.layers):
+            # if len(negative) == 0:
+            #     print("Stopping early")
+            #     break
             
-            classifier = ViolaJones(T = i)
+            classifier = ViolaJones(classifiers = 5*i)
             classifier.train(positive, negative)
             self.clfs.append(classifier)
             false_positives = []

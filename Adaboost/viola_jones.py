@@ -3,7 +3,6 @@ import math
 import pickle
 from Feature_Extraction.image_feature_extraction import integral_image, SubMatrix
 from Weak_Classifier.weak_classifier import WeakClassifier
-# import selectpercentile
 from sklearn.feature_selection import SelectPercentile, f_classif
 
 
@@ -26,7 +25,7 @@ class ViolaJones:
             if label == 1:
                 weights[i] /= (2 * num_face)
             else:
-                weights[i] = 1 / (2 * num_non_face)
+                weights[i] /= (2 * num_non_face)
             processed_data.append((iimg, label))
 
         features = self.build_features(processed_data[0][0].shape)
@@ -39,7 +38,13 @@ class ViolaJones:
         for stump in range(self.classifiers):
             weights = weights / np.linalg.norm(weights)
             weak_classifiers = self.train_weak(X, y, features, weights)
-            clf, error, accuracy = self.select_best(weak_classifiers, weights, processed_data)
+            clf, error, accuracy = self.select_best(
+                weak_classifiers, weights, processed_data)
+            if error == 0:
+                error = 1e-6
+            elif error == 1:
+                error = 1 - 1e-6
+            beta = error / (1.0 - error)
             beta = error / (1.0 - error)
             for i in range(len(accuracy)):
                 weights[i] = weights[i] * (beta ** (1 - accuracy[i]))
@@ -65,7 +70,7 @@ class ViolaJones:
             nwts = 0
             mn_e, best_ft, best_thr, best_polarity = float(
                 'inf'), None, None, None
-            for f, wt, label in sorted_fts:
+            for f, label, wt in sorted_fts:
                 err = min(nwts + (tot_pos_wts - pwts),
                           pwts + (tot_neg_wts - nwts))
                 if err < mn_e:
@@ -92,12 +97,12 @@ class ViolaJones:
         haar_features = []
         for wndw in range(1, width+1):
             for wndh in range(1, height+1):
-                for x in range(0, width-wndw+1):
-                    for y in range(0, height-wndh+1):
+                for x in range(0, width-wndw):
+                    for y in range(0, height-wndh):
                         # 2 rectangles
                         if x + 2*wndw < width:
-                            haar_features.append(([SubMatrix(x, y, wndw, wndh)], [
-                                                 SubMatrix(x+wndw, y, wndw, wndh)]))
+                            haar_features.append(([SubMatrix(x+wndw, y, wndw, wndh)], [SubMatrix(x, y, wndw, wndh)
+                                                                                       ]))
                         if y + 2*wndh < height:
                             haar_features.append(([SubMatrix(x, y, wndw, wndh)], [
                                                  SubMatrix(x, y+wndh, wndw, wndh)]))
@@ -110,28 +115,19 @@ class ViolaJones:
                                                  SubMatrix(x, y, wndw, wndh), SubMatrix(x, y+2*wndh, wndw, wndh)]))
                         # 4 rectangles
                         if x + 2*wndw < width and y + 2*wndh < height:
-                            haar_features.append(([SubMatrix(x, y, wndw, wndh), SubMatrix(
-                                x+wndw, y+wndh, wndw, wndh)], [SubMatrix(x+wndw, y, wndw, wndh), SubMatrix(x, y+wndh, wndw, wndh)]))
-        return np.array(haar_features)
+                            haar_features.append(([SubMatrix(x+wndw, y, wndw, wndh), SubMatrix(x, y+wndh, wndw, wndh)], [SubMatrix(x, y, wndw, wndh), SubMatrix(
+                                x+wndw, y+wndh, wndw, wndh)]))
+        return np.array(haar_features, dtype=object)
 
     def select_best(self, classifiers, weights, processed_data):
-        """
-        Selects the best weak classifier for the given weights
-          Args:
-            classifiers: An array of weak classifiers
-            weights: An array of weights corresponding to each training example
-            training_data: An array of tuples. The first element is the numpy array of shape (m, n) representing the integral image. The second element is its classification (1 or 0)
-          Returns:
-            A tuple containing the best classifier, its error, and an array of its accuracy
-        """
         bestclf = None
         besterr = float('inf')
         bestacc = None
         for clf in classifiers:
             err = 0
-            acc =  []
+            acc = []
             n = len(weights)
-            assert(len(weights)==(processed_data.shape[0]))
+            # assert(len(weights)==(processed_data.shape[0])) -> Srikar did this
             for i in range(n):
                 ground_truth = processed_data[i][1]
                 found_truth = clf.classify(processed_data[i][0])
@@ -144,7 +140,7 @@ class ViolaJones:
                 besterr = err
                 bestacc = acc
         return bestclf, besterr, bestacc
-    
+
     def apply_features(self, features, training_data):
         num_features = len(features)
         num_samples = len(training_data)
@@ -158,12 +154,13 @@ class ViolaJones:
             for j, iimg in enumerate(training_data):
                 pos_sum = 0
                 for pos in white_rect:
-                    pos_sum += pos.compute_feature(iimg)
+                    pos_sum += pos.get_feature_val(iimg[0])
                 neg_sum = 0
                 for neg in black_rect:
-                    neg_sum += neg.compute_feature(iimg)
+                    neg_sum += neg.get_feature_val(iimg[0])
                 X[i][j] = pos_sum - neg_sum
             i += 1
+        print("Finished applying features")
         return X, y
 
     def classify(self, image):
@@ -175,7 +172,11 @@ class ViolaJones:
             1 if the image is positively classified and 0 otherwise
         """
         total = 0
-        ii = integral_image(image)
-        for alpha, clf in zip(self.alphas, self.clfs):
-            total += alpha * clf.classify(ii)
-        return 1 if total >= 0.5 * sum(self.alphas) else 0
+        iimg = integral_image(image)
+        for i in range(len(self.clfs)):
+            total += self.alphas[i] * self.clfs[i].classify(iimg)
+
+        if total >= 0.5*sum(self.alphas):
+            return 1
+        else:
+            return 0
