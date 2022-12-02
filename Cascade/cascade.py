@@ -1,5 +1,5 @@
 import pickle
-
+from Adaboost.viola_jones import ViolaJones
 
 class CascadeClassifier:
     def __init__(self, layers):
