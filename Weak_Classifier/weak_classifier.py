@@ -10,8 +10,11 @@ class WeakClassifier:
         self.polarity = polarity
 
     def classify(self, x):
-        feature = lambda ii: sum([pos.get_feature_val(ii) for pos in self.positive_regions]) - sum([neg.get_feature_val(ii) for neg in self.negative_regions])
-        if self.polarity * feature(x) < self.polarity * self.threshold:
-            return 1
-        return 0
+        pos_sum = 0
+        for pos in self.positive_region:
+            pos_sum += pos.compute_feature(x)
+        neg_sum = 0
+        for neg in self.negative_region:
+            neg_sum += neg.compute_feature(x)
+        return 1 if self.polarity * (pos_sum - neg_sum) < self.polarity * self.threshold else 0
     
