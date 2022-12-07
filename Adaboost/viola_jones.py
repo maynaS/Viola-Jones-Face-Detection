@@ -160,17 +160,9 @@ class ViolaJones:
                     neg_sum += neg.get_feature_val(iimg[0])
                 X[i][j] = pos_sum - neg_sum
             i += 1
-        print("Finished applying features")
         return X, y
 
     def classify(self, image):
-        """
-        Classifies an image
-          Args:
-            image: A numpy 2D array of shape (m, n) representing the image
-          Returns:
-            1 if the image is positively classified and 0 otherwise
-        """
         total = 0
         iimg = integral_image(image)
         for i in range(len(self.clfs)):
